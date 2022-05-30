@@ -4,6 +4,8 @@
 #include <cstring>
 #include <iostream>
 #include <string>
+#include <ctime>
+#include <iomanip>
 
 #define CRLF "\r\n"
 #define HEADER_SPLIT "\r\n\r\n"
@@ -38,6 +40,12 @@ string HTTPMessage::host()
 bool HTTPMessage::isEmpty()
 {
     return raw_text.empty();
+}
+
+int HTTPMessage::getStatusCode() const
+{
+    string top_line = raw_text.substr(9, 3);
+    return std::atoi(top_line.data());
 }
 
 /// Parses header
@@ -77,4 +85,17 @@ std::ostream &operator<<(std::ostream &out, const HTTPMessage &msg)
 const string &HTTPMessage::to_string() const
 {
     return raw_text;
+}
+
+void HTTPMessage::addIffModifiedSince(const std::time_t& timestamp)
+{
+    date_mutex.lock();
+    
+    std::tm* gmt_time = std::gmtime(&timestamp);
+    std::stringstream data;
+    data << "\r\nIf-Modified-Since: ";
+    data << std::put_time(gmt_time, "%a, %d %b %Y %T GMT");
+    GFD::threadedCout("ADDED MODIFICATION DATE: ", data.str());
+    raw_text.insert(raw_text.find("\r\n\r\n"), data.str());
+    date_mutex.unlock();
 }

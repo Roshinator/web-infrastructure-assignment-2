@@ -40,7 +40,7 @@ void threadRunner(ClientSocket client)
     uint64_t spin_wait_count = 0;
     while (true)
     {
-        // Poll read client message
+        // Read client message
         SocketResult client_result = client.receive();
         client_would_block = client_result.err == EWOULDBLOCK;
         // If an error occurred, reset connection
@@ -54,33 +54,36 @@ void threadRunner(ClientSocket client)
             }
             break;
         }
-        // If message has content, check if server connection needs to be updated
-        if (!client_result.message.isEmpty())
+        GFD::threadedCout("Successful connection");
+        if (server.connectTo(80, client_result.message.host()) == false)
         {
-            GFD::threadedCout("Successful connection");
-            if (server.connectTo(80, client_result.message.host()) == false)
-            {
-                client.send(HTTPMessage("HTTP/1.1 400 Bad Request\r\n\r\n"));
-                break;
-            }
+            client.send(HTTPMessage("HTTP/1.1 400 Bad Request\r\n\r\n"));
+            break;
         }
         // If we have a server connection, send packet and poll receive
-        if (server.isConnected())
+        spin_wait_count = 0;
+        bool cached_msg = false;
+        HTTPMessage no_modified = HTTPMessage(client_result.message);
+        if (cache.containsItem(client_result.message))
         {
-            if (!client_result.message.isEmpty()) // If client message has content, send to server
-            {
-                spin_wait_count = 0;
-                server.send(client_result.message);
-            }
-            SocketResult server_result = server.receive();
-            server_would_block = server_result.err == EWOULDBLOCK;
-
-            if (!server_result.message.isEmpty()) // Forward back to client
-            {
-                //                cout << server_msg.to_string() << endl;
-                client.send(server_result.message.to_string());
-                spin_wait_count = 0;
-            }
+            cached_msg = true;
+            client_result.message.addIffModifiedSince(cache.getTimestamp(client_result.message));
+        }
+        server.send(client_result.message);
+        SocketResult server_result = server.receive();
+        server_would_block = server_result.err == EWOULDBLOCK;
+        
+        int http_status_code = server_result.message.getStatusCode();
+        if (http_status_code == 304)
+        {
+            client.send(cache.getItem(client_result.message));
+            cache.refreshItem(no_modified);
+        }
+        else
+        {
+            client.send(server_result.message.to_string());
+            spin_wait_count = 0;
+            cache.insertItem(no_modified, server_result.message);
         }
 
         spin_wait_count++;
@@ -121,6 +124,6 @@ void runProxy(int port)
 
 int main()
 {
-    runProxy(8081);
+    runProxy(8080);
     return 0;
 }

@@ -140,12 +140,17 @@ SocketResult ServerSocket::receive()
     std::string s;
     ssize_t status;
     int count = 0;
-    while ((status = recv(sockfd, RECV_BUFFER, RECV_BUFFER_SIZE, 0)) > 0)
+    bool exitedBlock = false;
+    while (!exitedBlock)
     {
-        count += status;
-        GFD::threadedCout("Receiving message from server");
-        s.append((char *)RECV_BUFFER, status);
-        std::fill_n(RECV_BUFFER, RECV_BUFFER_SIZE, 0);
+        while ((status = recv(sockfd, RECV_BUFFER, RECV_BUFFER_SIZE, 0)) > 0)
+        {
+            exitedBlock = true;
+            count += status;
+            GFD::threadedCout("Receiving message from server");
+            s.append((char *)RECV_BUFFER, status);
+            std::fill_n(RECV_BUFFER, RECV_BUFFER_SIZE, 0);
+        }
     }
     //    cout << "FILE DESC: " << sockfd << endl;
     int err = errno;

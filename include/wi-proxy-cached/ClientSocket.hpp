@@ -84,12 +84,18 @@ SocketResult ClientSocket::receive()
     std::string s;
     ssize_t status;
     int count = 0;
-    while ((status = recv(client_sockfd, RECV_BUFFER, RECV_BUFFER_SIZE, 0)) > 0)
+    errno = 0;
+    bool exitedBlock = false;
+    while (!exitedBlock)
     {
-        count += status;
-        GFD::threadedCout("Receiving mesage from client");
-        s.append((char *)RECV_BUFFER, status);
-        std::fill_n(RECV_BUFFER, RECV_BUFFER_SIZE, 0);
+        while ((status = recv(client_sockfd, RECV_BUFFER, RECV_BUFFER_SIZE, 0)) > 0)
+        {
+            exitedBlock = true;
+            count += status;
+            GFD::threadedCout("Receiving mesage from client");
+            s.append((char *)RECV_BUFFER, status);
+            std::fill_n(RECV_BUFFER, RECV_BUFFER_SIZE, 0);
+        }
     }
     //    cout << "FILE DESC: " << client_sockfd << endl;
     assert(s.length() == count);
