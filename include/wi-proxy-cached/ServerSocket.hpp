@@ -141,8 +141,9 @@ SocketResult ServerSocket::receive()
     ssize_t status;
     int count = 0;
     bool exitedBlock = false;
-    while (!exitedBlock)
+    do
     {
+        errno = 0;
         while ((status = recv(sockfd, RECV_BUFFER, RECV_BUFFER_SIZE, 0)) > 0)
         {
             exitedBlock = true;
@@ -151,7 +152,9 @@ SocketResult ServerSocket::receive()
             s.append((char *)RECV_BUFFER, status);
             std::fill_n(RECV_BUFFER, RECV_BUFFER_SIZE, 0);
         }
-    }
+        if (errno != EWOULDBLOCK)
+            exitedBlock = true;
+    } while (!exitedBlock);
     //    cout << "FILE DESC: " << sockfd << endl;
     int err = errno;
     errno = 0;

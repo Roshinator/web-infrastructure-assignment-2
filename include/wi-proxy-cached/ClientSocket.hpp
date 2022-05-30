@@ -21,6 +21,7 @@ using std::string;
 class ClientSocket
 {
     static constexpr uint16_t RECV_BUFFER_SIZE = 1024;
+    const int test = EWOULDBLOCK;
 
     const int addr_len = sizeof(struct sockaddr_in);
     uint8_t RECV_BUFFER[RECV_BUFFER_SIZE];
@@ -84,10 +85,10 @@ SocketResult ClientSocket::receive()
     std::string s;
     ssize_t status;
     int count = 0;
-    errno = 0;
     bool exitedBlock = false;
-    while (!exitedBlock)
+    do
     {
+        errno = 0;
         while ((status = recv(client_sockfd, RECV_BUFFER, RECV_BUFFER_SIZE, 0)) > 0)
         {
             exitedBlock = true;
@@ -96,7 +97,12 @@ SocketResult ClientSocket::receive()
             s.append((char *)RECV_BUFFER, status);
             std::fill_n(RECV_BUFFER, RECV_BUFFER_SIZE, 0);
         }
-    }
+        int error = errno;
+        if (error != EWOULDBLOCK)
+        {
+            exitedBlock = true;
+        }
+    } while (!exitedBlock);
     //    cout << "FILE DESC: " << client_sockfd << endl;
     assert(s.length() == count);
     int err = errno;
