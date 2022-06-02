@@ -85,24 +85,20 @@ SocketResult ClientSocket::receive()
     std::string s;
     ssize_t status;
     int count = 0;
-    bool exitedBlock = false;
-    do
+    HTTPMessage m("");
+    while ((status = recv(client_sockfd, RECV_BUFFER, RECV_BUFFER_SIZE, 0)) > 0)
     {
-        errno = 0;
-        while ((status = recv(client_sockfd, RECV_BUFFER, RECV_BUFFER_SIZE, 0)) > 0)
+        count += status;
+        GFD::threadedCout("Receiving message from client");
+        s.append((char *)RECV_BUFFER, status);
+        m = HTTPMessage(s);
+        std::fill_n(RECV_BUFFER, RECV_BUFFER_SIZE, 0);
+        int remaining_length = m.getRemainingLength();
+        if (remaining_length <= 0)
         {
-            exitedBlock = true;
-            count += status;
-            GFD::threadedCout("Receiving mesage from client");
-            s.append((char *)RECV_BUFFER, status);
-            std::fill_n(RECV_BUFFER, RECV_BUFFER_SIZE, 0);
+            break;
         }
-        int error = errno;
-        if (error != EWOULDBLOCK)
-        {
-            exitedBlock = true;
-        }
-    } while (!exitedBlock);
+    }
     //    cout << "FILE DESC: " << client_sockfd << endl;
     assert(s.length() == count);
     int err = errno;

@@ -13,6 +13,8 @@
 #include <utility>
 #include "CacheStorage.hpp"
 
+using namespace std::chrono_literals;
+
 using std::cout;
 using std::endl;
 using std::string;
@@ -39,6 +41,10 @@ void threadRunner(ClientSocket client)
             }
             break;
         }
+        if (client_result.message.isEmpty())
+        {
+            continue;
+        }
         GFD::threadedCout("Successful connection");
         if (server.connectTo(80, client_result.message.host()) == false)
         {
@@ -50,6 +56,7 @@ void threadRunner(ClientSocket client)
         HTTPMessage no_modified = HTTPMessage(client_result.message);
         if (cache.containsItem(client_result.message))
         {
+            GFD::threadedCout("Found cached message");
             cached_msg = true;
             client_result.message.addIffModifiedSince(cache.getTimestamp(client_result.message));
         }
@@ -57,10 +64,12 @@ void threadRunner(ClientSocket client)
         SocketResult server_result = server.receive();
         server_would_block = server_result.err == EWOULDBLOCK;
         
-        int http_status_code = server_result.message.getStatusCode();
-        if (http_status_code == 304)
+        if (!server_result.message.isEmpty() && server_result.message.getStatusCode() == 304)
         {
-            client.send(cache.getItem(client_result.message));
+            GFD::threadedCout("Message unmodified");
+            string s = cache.getItem(no_modified).to_string();
+            GFD::threadedCout("FOUND CACHED MESSAGE: ", s);
+            client.send(s);
             cache.refreshItem(no_modified);
         }
         else
@@ -68,6 +77,7 @@ void threadRunner(ClientSocket client)
             client.send(server_result.message.to_string());
             cache.insertItem(no_modified, server_result.message);
         }
+        break;
     }
     client.disconnect();
 }
@@ -88,6 +98,6 @@ void runProxy(int port)
 
 int main()
 {
-    runProxy(8080);
+    runProxy(8082);
     return 0;
 }

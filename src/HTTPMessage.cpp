@@ -27,7 +27,7 @@ HTTPMessage::HTTPMessage(const HTTPMessage &msg)
 HTTPMessage::HTTPMessage(const string &s)
 {
     raw_text = string(s);
-    parseHeader();
+    hostname = parseHeader("Host");
 }
 
 /// Gets the hostname
@@ -37,7 +37,7 @@ string HTTPMessage::host()
 }
 
 /// Returns true if the message is empty
-bool HTTPMessage::isEmpty()
+bool HTTPMessage::isEmpty() const
 {
     return raw_text.empty();
 }
@@ -49,7 +49,7 @@ int HTTPMessage::getStatusCode() const
 }
 
 /// Parses header
-void HTTPMessage::parseHeader()
+std::string HTTPMessage::parseHeader(const std::string& header) const
 {
     int split_loc = 0;
     if (!isEmpty())
@@ -57,7 +57,7 @@ void HTTPMessage::parseHeader()
         split_loc = raw_text.find(HEADER_SPLIT);
         string headers = raw_text.substr(0, split_loc);
         // Search for "\r\nHost: *\r\n"
-        const string pre = "\r\nHost: ";
+        const string pre = string("\r\n").append(header).append(": ");
         const string post = "\r\n";
         size_t pre_loc = headers.find(pre);
         if (pre_loc != string::npos)
@@ -68,12 +68,27 @@ void HTTPMessage::parseHeader()
             if (post_loc != string::npos)
             {
                 string post_cut = pre_cut.substr(0, post_loc);
-                hostname = post_cut;
-
-                GFD::threadedCout("Found hostname in packet: ", post_cut);
+                return post_cut;
             }
         }
     }
+    return "";
+}
+
+std::string HTTPMessage::parseBody() const
+{
+    int split_loc = 0;
+    if (!isEmpty())
+    {
+        split_loc = raw_text.find(HEADER_SPLIT);
+        if (split_loc == string::npos)
+        {
+            return "";
+        }
+        split_loc += 4;
+        return raw_text.substr(split_loc, raw_text.length() - split_loc);
+    }
+    return "";
 }
 
 std::ostream &operator<<(std::ostream &out, const HTTPMessage &msg)
@@ -98,4 +113,50 @@ void HTTPMessage::addIffModifiedSince(const std::time_t& timestamp)
     GFD::threadedCout("ADDED MODIFICATION DATE: ", data.str());
     raw_text.insert(raw_text.find("\r\n\r\n"), data.str());
     date_mutex.unlock();
+}
+
+int HTTPMessage::getRemainingLength() const
+{
+    if (isEmpty())
+    {
+        return 16000;
+    }
+    std::string body = std::string(parseBody());
+    std::string content_length_header = parseHeader("Content-Length");
+    std::string chunked_header = parseHeader("Transfer-Encoding");
+    bool is_chunked = chunked_header.find("chunked") != std::string::npos;
+    bool is_content = !is_chunked && !content_length_header.empty();
+    
+    if (is_chunked)
+    {
+        if (body.empty())
+            return 1600;
+        if (body.find("0\r\n\r\n") != std::string::npos)
+            return 0;
+        else
+            return 16000;
+//        int length = 100;
+//        do
+//        {
+//            string temp;
+//            std::getline(std::stringstream(body), temp, '\n');
+//            temp = temp.substr(0, temp.length() - 1); //remove \r
+//            length = std::stol(temp, nullptr, 16);
+//            body = body.substr(length, body.length() - length);
+//        } while ();
+    }
+    else if (is_content)
+    {
+        if (body.empty())
+            return 1600;
+        return std::stoi(content_length_header) - body.length();
+    }
+    else
+    {
+        if (raw_text.find(HEADER_SPLIT) == std::string::npos) //Headers incomplete
+        {
+            return 16000;
+        }
+        return 0;
+    }
 }

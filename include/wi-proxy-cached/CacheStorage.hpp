@@ -8,6 +8,7 @@
 #include <iostream>
 #include <chrono>
 #include <ctime>
+#include <iterator>
 #include "HTTPMessage.hpp"
 #include "GlobalItems.hpp"
 
@@ -23,7 +24,7 @@ class CacheStorage
 {
     const std::filesystem::path cache_folder_name = "cache_data";
     const std::string_view cache_file_name = "cache_cell_";
-    const int cache_size = 100;
+    const int cache_size = 500;
     
     std::unordered_map<std::string, CacheItem> lookup;
     std::mutex lookup_lock;
@@ -68,7 +69,7 @@ void CacheStorage::writeCell(std::string s, int index)
 {
     using namespace std::filesystem;
     
-    path p = "." / cache_folder_name / std::string(cache_file_name).append(std::to_string(index));
+    path p = "." / cache_folder_name / std::string(cache_file_name).append(std::to_string(index)).append(".txt");
     std::ofstream ofs(p, std::ios::trunc); //Clear the file when it's opened
     ofs << s;
     ofs.close();
@@ -78,14 +79,9 @@ std::string CacheStorage::readCell(int index)
 {
     using namespace std::filesystem;
     
-    path p = cache_folder_name / cache_file_name / std::to_string(index);
+    path p = "." / cache_folder_name / std::string(cache_file_name).append(std::to_string(index)).append(".txt");
     std::ifstream ifs(p);
-    string s;
-    std::string temp;
-    while (std::getline(ifs, temp))
-    {
-        s.append(temp);
-    }
+    string s(std::istreambuf_iterator<char>{ifs}, {});
     ifs.close();
     return s;
 }
@@ -102,7 +98,7 @@ SystemTimestamp CacheStorage::getTimestamp(HTTPMessage &msg)
 {
     lookup_lock.lock();
     auto t = lookup.at(msg.to_string()).timestamp;
-    lookup_lock.lock();
+    lookup_lock.unlock();
     return t;
 }
 
