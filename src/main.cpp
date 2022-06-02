@@ -68,7 +68,7 @@ void threadRunner(ClientSocket client)
         {
             GFD::threadedCout("Message unmodified");
             string s = cache.getItem(no_modified).to_string();
-            GFD::threadedCout("FOUND CACHED MESSAGE: ", s);
+            GFD::threadedCout("FOUND CACHED MESSAGE of size ", s.length(), " bytes");
             client.send(s);
             cache.refreshItem(no_modified);
         }
