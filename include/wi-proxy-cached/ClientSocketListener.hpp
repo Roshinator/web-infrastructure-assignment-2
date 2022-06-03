@@ -44,7 +44,6 @@ ClientSocketListener::ClientSocketListener(int port)
         exit(1);
     }
     GFD::threadedCout("Bound listener, open for connections");
-    //    cout << "Listening for Client" << endl;
     if (listen(listen_sockfd, 10) < 0)
     {
         GFD::threadedCout("Listen failed");
@@ -62,20 +61,11 @@ ClientSocketListener::~ClientSocketListener()
 
 ClientSocket ClientSocketListener::acceptClient()
 {
-    //    cout << "Client found, accepting connection" << endl;
     struct sockaddr_in client_addr;
     int client_sockfd;
     GFD::executeLockedFD(
         [&] { client_sockfd = accept(listen_sockfd, (struct sockaddr *)&client_addr, (socklen_t *)&addr_len); });
-    //    std::cout << "FROM: " << listen_sockfd << " ESTABLISHED CONNECTION WITH
-    //    FD: " << client_sockfd << std::endl;
-//    int flags = fcntl(client_sockfd, F_GETFL);
-//    fcntl(client_sockfd, F_SETFL, flags | O_NONBLOCK);
-    //    if (client_sockfd < 0)
-    //    {
-    //        std::cout << "Failed to accept client" << std::endl;
-    //        exit(1);
-    //    }
+
     if (client_sockfd > 0)
     {
         GFD::threadedCout("Connection established with client IP: ", inet_ntoa(client_addr.sin_addr),

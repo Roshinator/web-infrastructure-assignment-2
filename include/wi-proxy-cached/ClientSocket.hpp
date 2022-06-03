@@ -66,15 +66,7 @@ void ClientSocket::send(const HTTPMessage &item)
     const string &s = item.to_string();
     GFD::threadedCout("Sending message to client");
     int len;
-    while (true)
-    {
-        errno = 0;
-        len = ::send(client_sockfd, s.data(), s.length(), 0);
-        if (len > 0 || (errno != EWOULDBLOCK && errno != EAGAIN))
-        {
-            break;
-        }
-    }
+    len = ::send(client_sockfd, s.data(), s.length(), 0);
     errno = 0;
     GFD::threadedCout("Sent ", len, " bytes from ", s.length(), " sized packet to client");
 }
@@ -82,26 +74,23 @@ void ClientSocket::send(const HTTPMessage &item)
 /// Receives a message and returns the message and error code from the recv call
 SocketResult ClientSocket::receive()
 {
-    std::string s;
     ssize_t status;
-    int count = 0;
     HTTPMessage m("");
     while ((status = recv(client_sockfd, RECV_BUFFER, RECV_BUFFER_SIZE, 0)) > 0)
     {
-        count += status;
         GFD::threadedCout("Receiving message from client");
+        std::string s;
         s.append((char *)RECV_BUFFER, status);
         m = HTTPMessage(s);
         std::fill_n(RECV_BUFFER, RECV_BUFFER_SIZE, 0);
-        int remaining_length = m.getRemainingLength();
-        if (remaining_length <= 0)
+        bool complete = m.contentComplete();
+        if (complete)
         {
             break;
         }
     }
     //    cout << "FILE DESC: " << client_sockfd << endl;
-    assert(s.length() == count);
     int err = errno;
     errno = 0;
-    return SocketResult{HTTPMessage(s), status, err};
+    return SocketResult{m, status, err};
 }

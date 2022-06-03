@@ -51,7 +51,7 @@ void threadRunner(ClientSocket client)
             client.send(HTTPMessage("HTTP/1.1 400 Bad Request\r\n\r\n"));
             break;
         }
-        // If we have a server connection, send packet and poll receive
+        // If we have a server connection, check for caching and send
         bool cached_msg = false;
         HTTPMessage no_modified = HTTPMessage(client_result.message);
         if (cache.containsItem(client_result.message))
@@ -64,6 +64,7 @@ void threadRunner(ClientSocket client)
         SocketResult server_result = server.receive();
         server_would_block = server_result.err == EWOULDBLOCK;
         
+        //If cached
         if (!server_result.message.isEmpty() && server_result.message.getStatusCode() == 304)
         {
             GFD::threadedCout("Message unmodified");
@@ -72,7 +73,7 @@ void threadRunner(ClientSocket client)
             client.send(s);
             cache.refreshItem(no_modified);
         }
-        else
+        else //If not cached
         {
             client.send(server_result.message.to_string());
             cache.insertItem(no_modified, server_result.message);

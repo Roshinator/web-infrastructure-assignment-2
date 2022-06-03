@@ -94,9 +94,7 @@ bool ServerSocket::connectTo(int port, string addr)
         sockfd = -1;
         return false;
     }
-    // Set non-blocking on the socket
-//    int flags = fcntl(sockfd, F_GETFL);
-//    fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
+    
     GFD::threadedCout(
         "Connection established with server IP: ", inet_ntoa(((struct sockaddr_in *)server_addr->ai_addr)->sin_addr),
         " and port: ", ntohs(((struct sockaddr_in *)server_addr->ai_addr)->sin_port));
@@ -123,15 +121,8 @@ void ServerSocket::send(const HTTPMessage &item)
     GFD::threadedCout("Sending message to server");
     const std::string &s = item.to_string();
     int len;
-    while (true)
-    {
-        errno = 0;
-        len = ::send(sockfd, s.data(), s.length(), 0);
-        if (len > 0 || (errno != EWOULDBLOCK && errno != EAGAIN))
-        {
-            break;
-        }
-    }
+    len = ::send(sockfd, s.data(), s.length(), 0);
+    errno = 0;
     GFD::threadedCout("Sent ", len, " bytes from ", s.length(), " sized packet to server");
 }
 
@@ -140,21 +131,18 @@ SocketResult ServerSocket::receive()
 {
     using namespace std::chrono_literals;
     
-    std::string s;
     ssize_t status = 0;
-    int count = 0;
     errno = 0;
-    int lastStatus = -1;
     HTTPMessage m("");
     while ((status = recv(sockfd, RECV_BUFFER, RECV_BUFFER_SIZE, 0)) > 0)
     {
-        count += status;
         GFD::threadedCout("Receiving message from server");
+        std::string s;
         s.append((char *)RECV_BUFFER, status);
-        m = HTTPMessage(s);
+        m.append(s);
         std::fill_n(RECV_BUFFER, RECV_BUFFER_SIZE, 0);
-        int remaining_length = m.getRemainingLength();
-        if (remaining_length <= 0)
+        bool complete = m.contentComplete();
+        if (complete)
         {
             break;
         }
@@ -162,5 +150,5 @@ SocketResult ServerSocket::receive()
     //    cout << "FILE DESC: " << sockfd << endl;
     int err = errno;
     errno = 0;
-    return SocketResult{HTTPMessage(s), status, err};
+    return SocketResult{m, status, err};
 }

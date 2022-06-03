@@ -36,6 +36,11 @@ string HTTPMessage::host()
     return hostname;
 }
 
+void HTTPMessage::append(std::string &s)
+{
+    raw_text.append(s);
+}
+
 /// Returns true if the message is empty
 bool HTTPMessage::isEmpty() const
 {
@@ -75,6 +80,7 @@ std::string HTTPMessage::parseHeader(const std::string& header) const
     return "";
 }
 
+/// Returns the body component of the message
 std::string HTTPMessage::parseBody() const
 {
     int split_loc = 0;
@@ -102,6 +108,8 @@ const string &HTTPMessage::to_string() const
     return raw_text;
 }
 
+/// Adds an if modified since timestamp header
+/// @param timestamp timestamp to use
 void HTTPMessage::addIffModifiedSince(const std::time_t& timestamp)
 {
     date_mutex.lock();
@@ -115,11 +123,12 @@ void HTTPMessage::addIffModifiedSince(const std::time_t& timestamp)
     date_mutex.unlock();
 }
 
-int HTTPMessage::getRemainingLength() const
+/// Returns true if there is still data to parse
+bool HTTPMessage::contentComplete() const
 {
     if (isEmpty())
     {
-        return 16000;
+        return true;
     }
     std::string body = std::string(parseBody());
     std::string content_length_header = parseHeader("Content-Length");
@@ -130,33 +139,24 @@ int HTTPMessage::getRemainingLength() const
     if (is_chunked)
     {
         if (body.empty())
-            return 1600;
+            return false;
         if (body.find("0\r\n\r\n") != std::string::npos)
-            return 0;
+            return true;
         else
-            return 16000;
-//        int length = 100;
-//        do
-//        {
-//            string temp;
-//            std::getline(std::stringstream(body), temp, '\n');
-//            temp = temp.substr(0, temp.length() - 1); //remove \r
-//            length = std::stol(temp, nullptr, 16);
-//            body = body.substr(length, body.length() - length);
-//        } while ();
+            return false;
     }
     else if (is_content)
     {
         if (body.empty())
-            return 1600;
-        return std::stoi(content_length_header) - body.length();
+            return false;
+        return (std::stoi(content_length_header) - body.length()) == 0;
     }
     else
     {
         if (raw_text.find(HEADER_SPLIT) == std::string::npos) //Headers incomplete
         {
-            return 16000;
+            return false;
         }
-        return 0;
+        return true;
     }
 }

@@ -24,7 +24,7 @@ class CacheStorage
 {
     const std::filesystem::path cache_folder_name = "cache_data";
     const std::string_view cache_file_name = "cache_cell_";
-    const int cache_size = 500;
+    const int cache_size = 20;
     
     std::unordered_map<std::string, CacheItem> lookup;
     std::mutex lookup_lock;
@@ -75,6 +75,8 @@ void CacheStorage::writeCell(std::string s, int index)
     ofs.close();
 }
 
+/// Reads a cache file
+/// @param index index of the cache cell
 std::string CacheStorage::readCell(int index)
 {
     using namespace std::filesystem;
@@ -86,6 +88,8 @@ std::string CacheStorage::readCell(int index)
     return s;
 }
 
+/// Returns true if the message is in the cache
+/// @param msg message to check
 bool CacheStorage::containsItem(HTTPMessage &msg)
 {
     lookup_lock.lock();
@@ -94,6 +98,8 @@ bool CacheStorage::containsItem(HTTPMessage &msg)
     return contained;
 }
 
+/// Gets the timestamp of a cached message
+/// @param msg message to check
 SystemTimestamp CacheStorage::getTimestamp(HTTPMessage &msg)
 {
     lookup_lock.lock();
@@ -102,6 +108,9 @@ SystemTimestamp CacheStorage::getTimestamp(HTTPMessage &msg)
     return t;
 }
 
+/// Inserts an item into the cache following LRU
+/// @param msg message to check
+/// @param response response paired with the message
 void CacheStorage::insertItem(HTTPMessage &msg, HTTPMessage& response)
 {
     lookup_lock.lock();
@@ -133,6 +142,8 @@ void CacheStorage::insertItem(HTTPMessage &msg, HTTPMessage& response)
     lookup_lock.unlock();
 }
 
+/// Updates the timestamp of a cache (recently used)
+/// @param msg message to update
 void CacheStorage::refreshItem(HTTPMessage &msg)
 {
     lookup_lock.lock();
@@ -144,6 +155,8 @@ void CacheStorage::refreshItem(HTTPMessage &msg)
     lookup_lock.unlock();
 }
 
+/// Gets an item from the cache
+/// @param msg description of the item
 HTTPMessage CacheStorage::getItem(HTTPMessage &msg)
 {
     lookup_lock.lock();
@@ -155,6 +168,7 @@ HTTPMessage CacheStorage::getItem(HTTPMessage &msg)
     return HTTPMessage(data);
 }
 
+/// Gets the current time as a timestamp
 SystemTimestamp CacheStorage::getTime()
 {
     return std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());

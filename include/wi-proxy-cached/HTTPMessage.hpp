@@ -21,7 +21,8 @@ class HTTPMessage
     std::string host();
     void addIffModifiedSince(const std::time_t& timestamp);
     int getStatusCode() const;
-    int getRemainingLength() const;
+    bool contentComplete() const;
+    void append(std::string& s);
 
     friend std::ostream &operator<<(std::ostream &out, const HTTPMessage &msg);
     HTTPMessage operator=(HTTPMessage in)
